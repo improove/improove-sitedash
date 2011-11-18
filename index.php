@@ -7,16 +7,10 @@ require_once(APP_PATH.'lib/service.php');
  *
  */
 $ga = new gapi(GOOGLE_USERNAME, GOOGLE_PASSWORD);
-/*
-if($sites = $ga->requestAccountData()) {
-    echo '<ul>';
-    foreach($sites as $site) {
-        echo '<li>', $site, '</li>';
-    }
-    echo '</ul>';
+/*if($sites = $ga->requestAccountData()) {
     print_r($sites);
-}
-*/
+}*/
+
 $ga->requestReportData(
     $analytics_report, // report_id
     array('date','hour'), // dimensions
@@ -54,12 +48,14 @@ if($performance) {
  * Prepare data for graph
  *
  */
-$rows = array();
+$hours = array();
+$views = array();
+$times = array();
 foreach($analytics as $data) {
     $pageviews = $data->getPageviews();
     $visits = $data->getVisits();
-    if($pageviews || $visits || !empty($rows)) {
-        if(count($rows) >= 24) {
+    if($pageviews || $visits || !empty($hours)) {
+        if(count($hours) >= 24) {
             break;
         }
         $dimesions = $data->getDimesions();
@@ -67,73 +63,135 @@ foreach($analytics as $data) {
 
         $responsetime = $responsetimes[$hour];
 
-        $rows[] = array($hour, $pageviews, $responsetime);
+        $hours[] = $hour;
+        $views[] = $pageviews;
+        $times[] = $responsetime;
+        
+        //$rows[] = array($hour, $pageviews, $responsetime);
     }
 }
-$rows = array_reverse($rows);
-?>
+$hours = array_reverse($hours);
+$views = array_reverse($views);
+$times = array_reverse($times);
+
+?><!DOCTYPE html>
 <html>
     <head>
-        <script type="text/javascript" src="https://www.google.com/jsapi"></script>
-        <script type="text/javascript">
-            // Set dynamic values
-            var siteData = [
-                <?php foreach($rows as $row) : ?>
-                    ['<?php echo $row[0]; ?>', <?php echo $row[1]; ?>, <?php echo $row[2]; ?>/<?php echo $data_division; ?>],
-                <?php endforeach; ?>
-            ];
-            var siteTitle = '<?php echo $graph_title; ?>';
-
-
-            // Load the Visualization API and the piechart package.
-            google.load('visualization', '1.0', {'packages':['corechart']});
-
-            // Set a callback to run when the Google Visualization API is loaded.
-            google.setOnLoadCallback(drawChart);
-
-            // Callback that creates and populates a data table, 
-            // instantiates the pie chart, passes in the data and
-            // draws it.
-            function drawChart() {
-                // Create the data table.
-                var data = new google.visualization.DataTable();
-                data.addColumn('string', 'Views & visits');
-                data.addColumn('number', 'Pageviews');
-                data.addColumn('number', 'Performance');
-                data.addRows(siteData);
-
-                // Set chart options
-                var options = {
-                    'title': siteTitle,
-                    'width': 1150,
-                    'height': 600,
-                };
-
-                // Instantiate and draw our chart, passing in some options.
-                var chart = new google.visualization.LineChart(document.getElementById('chart'));
-                chart.draw(data, options);
-            }
-        </script>
+        <meta charset="utf-8" />
+        <title>Sitedash</title>
     </head>
-    <body style="height:100%;margin:0;padding:0;">
-        <div id="chart" style="margin:0 auto;width:1150px;position:absolute;top:50%;margin-top:-300px;margin-left:-575px;left:50%;"></div>
-        <!-- table style="margin:0 auto;">
-            <thead>
-                <tr>
-                    <th>Hour</th>
-                    <th>Pageviews</th>
-                    <th>Response time</th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php foreach($rows as $row) : ?>
-                    <tr>
-                        <th><?php echo $row[0]; ?></th>
-                        <td><?php echo $row[1]; ?></td>
-                        <td><?php echo $row[2]; ?></td>
-                    <tr>
-                <?php endforeach; ?>
-            </tbody>
-        </table -->
+    <body>
+        <div id="chart" style="width: 900px; height: 200px; margin: 0 auto"></div>
+
+        <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.6.1/jquery.min.js"></script>
+        <script type="text/javascript" src="js/highcharts.js"></script>
+        <script type="text/javascript">
+            var chart;
+            $(document).ready(function() {
+
+                chart = new Highcharts.Chart({
+                    chart: {
+                        renderTo: 'chart',
+                        zoomType: 'xy'
+                    },
+                    title: {
+                        text: false
+                    },
+                    exporting: {
+                        enabled: false // Hide buttons
+                    },
+                    tooltip: {
+                        formatter: function() {
+                            var unit = {
+                                'Response time': 'ms',
+                                'Visitors': ''
+                            }[this.series.name];
+                            return ''+this.x +': '+ this.y +' '+ unit;
+                        }
+                    },
+                    plotOptions: {
+                        area: {
+                            shadow: false,
+                            marker: {
+                                radius: 3
+                            },
+                            fillOpacity: .5,
+                            lineWidth: 3,
+                            states: {
+                                hover: {
+                                    lineWidth: 3
+                                }
+                            }
+                        },
+                        line: {
+                            marker: {
+                                symbol: 'circle',
+                                lineWidth: 1,
+                                radius: 4
+                            },
+                            lineWidth: 4,
+                            states: {
+                                hover: {
+                                    lineWidth: 4
+                                }
+                            }
+                        }
+                    },
+                    legend: {
+                        enabled: false
+                    },
+                    yAxis: [{
+                        gridLineWidth: 0,
+                        title: {
+                            text: 'Visitors (Analytics)',
+                            style: {
+                                color: '#0077cc'
+                            }
+                        },
+                        labels: {
+                            formatter: function() {
+                                return this.value;
+                            },
+                            style: {
+                                color: '#999'
+                            }
+                        }
+                    }, {
+                        gridLineWidth: 0,
+                        title: {
+                            text: 'Response time (Pingdom)',
+                            style: {
+                                color: '#00cc00'
+                            }
+                        },
+                        labels: {
+                            formatter: function() {
+                                return this.value+'ms';
+                            },
+                            style: {
+                                color: '#999'
+                            }
+                        },
+                        opposite: true
+                    }],
+                    xAxis: [{
+                        categories: <?php echo json_encode($hours); ?>
+                    }],
+                    series: [{
+                        name: 'Response time', // Pingdom
+                        color: '#00cc00',
+                        type: 'area',
+                        yAxis: 1,
+                        data: <?php echo json_encode($times); ?>
+                    }, {
+                        name: 'Visitors', // Analytics
+                        type: 'line',
+                        color: '#0077cc',
+                        data: <?php echo json_encode($views); ?>
+                    }]
+                });
+
+            });
+        </script>
     </body>
 </html>

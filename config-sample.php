@@ -14,7 +14,7 @@ define('GOOGLE_PASSWORD', '');
 
 define('PINGDOM_USERNAME', '');
 define('PINGDOM_PASSWORD', '');
-define('PINGDOM_KEY', '');
+define('PINGDOM_KEY', ''); // Global key (not tied to username)
 
 /**
  * Debug and Error Settings
@@ -24,13 +24,13 @@ error_reporting(E_ALL); // 0|E_ALL
 ini_set('display_errors', '1'); // 0|1
 
 /**
- * Graph and data settings
+ * Charts and data settings
  *
  */
-$graph_title        = ''; // ex. acnestudios.com
-$analytics_report   = ; // ex. 33645348, must be accessible from given Google account
-$pingdom_check      = ; // ex. 240735 must be accessible from given Pingdom account
-
-if(!$graph_title || !$analytics_report || !$pingdom_check) {
-    die('Configure the application correctly.');
-}
+$charts = array(
+    'my-site' => array(
+        'title'     => 'My Site',
+        'analytics' => 0, // Report ID ex. 33645348, must be accessible from given Google account
+        'pingdom'   => 0 // Check ID ex. 240735 must be accessible from given Pingdom account
+    )
+);

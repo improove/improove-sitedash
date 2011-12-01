@@ -16,6 +16,19 @@ $pingdom = new Pingdom(PINGDOM_USERNAME, PINGDOM_PASSWORD, PINGDOM_KEY);
  *
  */
 foreach($charts as $slug => $chart) {
+
+    /**
+     * Read data from cache if exists and have not expired
+     *
+     */
+    if(file_exists(APP_PATH.'cache/'.$slug)) {
+        $cache = json_decode(file_get_contents(APP_PATH.'cache/'.$slug), true);
+        if(isset($cache['generated']) && $cache['generated'] > time()-1800) {
+            $charts[$slug] = $cache;
+            continue;
+        }
+    }
+
     /**
      * Get Analytics data
      *
@@ -81,13 +94,11 @@ foreach($charts as $slug => $chart) {
     $charts[$slug]['hours'] = array_reverse($hours);
     $charts[$slug]['views'] = array_reverse($views);
     $charts[$slug]['times'] = array_reverse($times);
-    // TODO: Cache data for 30 min
+
+    // Simple file cache
+    $charts[$slug]['generated'] = time();
+    @file_put_contents(APP_PATH.'cache/'.$slug, json_encode($charts[$slug]));
 }
-
-
-
-
-
 
 ?><!DOCTYPE html>
 <html>

@@ -8,6 +8,12 @@ A simple monitor application using data from Pingdom and Google Analytics.
 
 Found a bug or missing a feature? Don't hesitate to create a new issue here on GitHub. Or contact me [directly](https://github.com/ptz0n).
 
+## Installation
+
+1. Create a file named `config.php` based on `sample-config.php`. Fill out Pingdom and Google accound info.
+2. Populate the `$charts` array with the site(s) or application(s) to monitor.
+3. Create a folder named `cache` with write premissions to enable caching.
+
 ## License
 
 Copyright (c) 2011 Erik Pettersson

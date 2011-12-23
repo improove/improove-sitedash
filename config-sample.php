@@ -4,6 +4,7 @@
  *
  */
 define('APP_PATH', realpath($_SERVER['DOCUMENT_ROOT']).'/');
+define('APP_CACHE', true);
 
 /**
  * Services access details

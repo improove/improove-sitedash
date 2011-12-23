@@ -46,6 +46,7 @@ var defaults = {
         enabled: false
     },
     yAxis: [{
+        min: 0,
         gridLineWidth: 0,
         title: {
             text: 'Page views (Analytics)',

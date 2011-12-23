@@ -8,7 +8,7 @@ require_once(APP_PATH.'lib/service.php');
  */
 $ga = new gapi(GOOGLE_USERNAME, GOOGLE_PASSWORD);
 // TODO: Catch analytics auth exception
-$pingdom = new Pingdom(PINGDOM_USERNAME, PINGDOM_PASSWORD, PINGDOM_KEY);
+$pd = new Pingdom(PINGDOM_USERNAME, PINGDOM_PASSWORD, PINGDOM_KEY);
 // TODO: Catch pingdom auth exception
 
 /**
@@ -18,10 +18,10 @@ $pingdom = new Pingdom(PINGDOM_USERNAME, PINGDOM_PASSWORD, PINGDOM_KEY);
 foreach($charts as $slug => $chart) {
 
     /**
-     * Read data from cache if exists and have not expired
+     * Read data from cache if exists, have not expired and is enabled
      *
      */
-    if(file_exists(APP_PATH.'cache/'.$slug)) {
+    if(file_exists(APP_PATH.'cache/'.$slug) && APP_CACHE) {
         $cache = json_decode(file_get_contents(APP_PATH.'cache/'.$slug), true);
         if(isset($cache['generated']) && $cache['generated'] > time()-1800) {
             $charts[$slug] = $cache;
@@ -37,15 +37,22 @@ foreach($charts as $slug => $chart) {
         $ga->requestReportData(
             $chart['analytics'], // report_id
             array('date','hour'), // dimensions
-            array('pageviews', 'visits', 'pageLoadTime'), // metrics
+            array('pageviews'/*, 'visits', 'pageLoadTime'*/), // metrics
             array('-date', '-hour'), // sort_metric
             null, // filter
             null, // start_date
             null, // end_date
             1, // start_index
-            48 // max_results
+            60 // max_results
         );
-        $analytics = $ga->getResults();
+        if($analytics = $ga->getResults()) {
+            foreach ($analytics as $data) {
+                $pageviewsData = $data->getPageviews();
+                $dimesionsData = $data->getDimesions();
+                $date = strtotime($dimesionsData['date'].' '.$dimesionsData['hour'].':00:00');
+                $charts[$slug]['data'][$date]['pageviews'] = $pageviewsData;
+            }
+        }
     }
 
     /**
@@ -53,18 +60,16 @@ foreach($charts as $slug => $chart) {
      *
      */    
     if($chart['pingdom']) {
-        $performance = $pingdom->summaryPerformance($chart['pingdom'], array(
-            'from' => time()-(60*60*48),
-            'to' => time(),
-            'resolution' => 'hour',
+        $pingdomRequest = array(
+            'from'          => time()-(60*60*48), // Last 48 hours
+            'to'            => time(),
+            'resolution'    => 'hour',
             'includeuptime' => 'true',
-            'order' => 'desc'
-        ));
-        if($performance) {
-            $responsetimes = array();
+            'order'         => 'desc'
+        );
+        if($performance = $pd->summaryPerformance($chart['pingdom'], $pingdomRequest)) {
             foreach($performance->summary->hours as $data) {
-                $hour = date('H', $data->starttime);
-                $responsetimes[$hour] = $data->avgresponse;
+                $charts[$slug]['data'][$data->starttime]['avgresponse'] = $data->avgresponse;
             }
         }
     }
@@ -74,26 +79,25 @@ foreach($charts as $slug => $chart) {
      *
      */
     $hours = array();
-    $views = array();
-    $times = array();
-    foreach($analytics as $data) {
-        $pageviews = $data->getPageviews();
-        $visits = $data->getVisits();
-        if($pageviews || $visits || !empty($hours)) {
+    $pageviews = array();
+    $avgresponse = array();
+    foreach($charts[$slug]['data'] as $hour => $data) {
+        if((isset($data['pageviews']) && $data['pageviews']) ||
+            (isset($data['avgresponse']) && $data['avgresponse']) ||
+            !empty($hours)) {
+
             if(count($hours) >= 24) {
                 break;
             }
-            $dimesions = $data->getDimesions();
-            $hour = $dimesions['hour'];
+            $hours[]        = date('H', $hour) == '00' ? date('M j') : date('H', $hour);
+            $pageviews[]    = isset($data['pageviews']) ? $data['pageviews'] : 0;
+            $avgresponse[]  = isset($data['avgresponse']) ? $data['avgresponse'] : 0;
 
-            $hours[] = $hour;
-            $views[] = $pageviews;
-            $times[] = isset($responsetimes[$hour]) ? $responsetimes[$hour] : null;
         }
     }
     $charts[$slug]['hours'] = array_reverse($hours);
-    $charts[$slug]['views'] = array_reverse($views);
-    $charts[$slug]['times'] = array_reverse($times);
+    $charts[$slug]['pageviews'] = array_reverse($pageviews);
+    $charts[$slug]['avgresponse'] = array_reverse($avgresponse);
 
     // Simple file cache
     $charts[$slug]['generated'] = time();
@@ -136,12 +140,12 @@ foreach($charts as $slug => $chart) {
                             color: '#00cc00',
                             type: 'area',
                             yAxis: 1,
-                            data: <?php echo json_encode($chart['times']); ?>
+                            data: <?php echo json_encode($chart['avgresponse']); ?>
                         }, {
                             name: 'Page views', // Analytics
                             type: 'line',
                             color: '#0077cc',
-                            data: <?php echo json_encode($chart['views']); ?>
+                            data: <?php echo json_encode($chart['pageviews']); ?>
                         }]
                     }));
                 <?php endforeach; ?>

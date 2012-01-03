@@ -3,11 +3,22 @@ require_once('config.php');
 require_once(APP_PATH.'lib/service.php');
 
 /**
- * Auth services
+ * Auth with Google
  *
  */
-$ga = new gapi(GOOGLE_USERNAME, GOOGLE_PASSWORD);
-// TODO: Catch analytics auth exception
+if(file_exists(APP_PATH.'cache/google')) {
+    $ga = new gapi(GOOGLE_USERNAME, GOOGLE_PASSWORD, file_get_contents(APP_PATH.'cache/google'));
+}
+else {
+    $ga = new gapi(GOOGLE_USERNAME, GOOGLE_PASSWORD);
+    file_put_contents(APP_PATH.'cache/google', $ga->getAuthToken());
+    // TODO: Catch analytics auth exception
+}
+
+/**
+ * Auth with Pingdom
+ *
+ */
 $pd = new Pingdom(PINGDOM_USERNAME, PINGDOM_PASSWORD, PINGDOM_KEY);
 // TODO: Catch pingdom auth exception
 
@@ -45,6 +56,8 @@ foreach($charts as $slug => $chart) {
             1, // start_index
             60 // max_results
         );
+        // TODO: Batch API requests with multicurl
+        // TODO: Correct time-diff based on profile time zone
         if($analytics = $ga->getResults()) {
             foreach ($analytics as $data) {
                 $pageviewsData = $data->getPageviews();
@@ -67,6 +80,7 @@ foreach($charts as $slug => $chart) {
             'includeuptime' => 'true',
             'order'         => 'desc'
         );
+        // TODO: Batch API requests with multicurl
         if($performance = $pd->summaryPerformance($chart['pingdom'], $pingdomRequest)) {
             foreach($performance->summary->hours as $data) {
                 $charts[$slug]['data'][$data->starttime]['avgresponse'] = $data->avgresponse;
